@@ -7,10 +7,32 @@ import (
 	"os"
 )
 
+const redX = "\033[1;31m✘\033[0m"
+
+// statusRecorder captures the status code written by the wrapped handler.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
+}
+
 func loggingHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.Method, r.URL.Path)
-		h.ServeHTTP(w, r)
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		h.ServeHTTP(rec, r)
+		if rec.status >= 400 {
+			log.Println(redX, r.Method, r.URL.Path, rec.status)
+		} else {
+			log.Println(r.Method, r.URL.Path)
+		}
 	})
 }
 
